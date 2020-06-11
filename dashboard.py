@@ -202,10 +202,10 @@ class ClimatisationClimate(Climate):
     def target_temperature(self):
         return self.vehicle.climatisation_target_temperature
 
-    def set_temperature(self, temperature):
+    async def set_temperature(self, temperature):
         self.vehicle.set_climatisation_target_temperature(temperature)
 
-    def set_hvac_mode(self, hvac_mode):
+    async def set_hvac_mode(self, hvac_mode):
         if hvac_mode:
             self.vehicle.start_climatisation()
         else:
@@ -312,10 +312,10 @@ class Climatisation(Switch):
     def state(self):
         return self.vehicle.climatisation
 
-    def turn_on(self):
+    async def turn_on(self):
         self.vehicle.start_climatisation()
 
-    def turn_off(self):
+    async def turn_off(self):
         self.vehicle.stop_climatisation()
 
     @property
@@ -330,10 +330,10 @@ class Charging(Switch):
     def state(self):
         return self.vehicle.charging
 
-    def turn_on(self):
+    async def turn_on(self):
         self.vehicle.start_charging()
 
-    def turn_off(self):
+    async def turn_off(self):
         self.vehicle.stop_charging()
 
     @property
@@ -348,10 +348,10 @@ class WindowHeater(Switch):
     def state(self):
         return self.vehicle.window_heater
 
-    def turn_on(self):
+    async def turn_on(self):
         self.vehicle.start_window_heater()
 
-    def turn_off(self):
+    async def turn_off(self):
         self.vehicle.stop_window_heater()
 
     @property
@@ -369,10 +369,10 @@ class CombustionEngineHeating(Switch):
     def state(self):
         return self.vehicle.combustion_engine_heating
 
-    def turn_on(self):
+    async def turn_on(self):
         self.vehicle.start_combustion_engine_heating(self.spin)
 
-    def turn_off(self):
+    async def turn_off(self):
         self.vehicle.stop_combustion_engine_heating()
 
     @property

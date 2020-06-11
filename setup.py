@@ -19,6 +19,7 @@ setup(
     provides=["volkswagencarnet"],
     install_requires=[
         'requests',
+        'aiohttp',
         'lxml',
         'beautifulsoup4'
     ]

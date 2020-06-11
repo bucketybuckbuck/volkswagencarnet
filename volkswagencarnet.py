@@ -4,6 +4,7 @@
 import re
 import time
 import logging
+import asyncio
 
 from sys import version_info
 from requests import Session, RequestException, packages
@@ -15,6 +16,9 @@ from json import dumps as to_json
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 from utilities import find_path, is_valid_path
+
+from aiohttp import ClientSession, ClientTimeout, BasicAuth
+from aiohttp.hdrs import METH_GET, METH_POST
 
 version_info >= (3, 0) or exit('Python 3 required')
 
@@ -72,7 +76,7 @@ class Connection(object):
 
         self._state = {}
 
-    def _login(self):
+    async def _login(self):
         """ Reset session in case we would like to login again """
         self._session = TimeoutRequestsSession()
         self._session_headers = {'Accept': 'application/json, text/plain, */*', 'Content-Type': 'application/json;charset=UTF-8',
@@ -96,7 +100,7 @@ class Connection(object):
 
             # Request login page and get CSRF
             self._session_auth_headers['Referer'] = self._session_base + 'portal'
-            req = self._session.post(
+            req = await self._session.post(
                 self._session_base + 'portal/web/guest/home/-/csrftokenhandling/get-login-url', headers=self._session_auth_headers)
             if req.status_code != 200:
                 return ""
@@ -241,7 +245,7 @@ class Connection(object):
             self._session_logged_in = False
             return False
 
-    def _request(self, method, ref, rel=None):
+    async def _request(self, method, ref, rel=None):
         url = urljoin(rel or self._session_auth_ref_url, ref)
         try:
             _LOGGER.debug('Request for %s', url)
@@ -255,18 +259,18 @@ class Connection(object):
                 'Failure when communcating with the server: %s, url: %s', error, url)
             raise
 
-    def _logout(self):
+    async def _logout(self):
         self.post('-/logout/revoke')
 
-    def get(self, ref, rel=None):
+    async def get(self, ref, rel=None):
         """Perform a get query to the online service."""
         return self._request(self._session.get, ref, rel)
 
-    def post(self, ref, rel=None, **data):
+    async def post(self, ref, rel=None, **data):
         """Perform a post query to the online service."""
         return self._request(partial(self._session.post, json=data), ref, rel)
 
-    def update(self, reset=False, request_data=True):
+    async def update(self, reset=False, request_data=True):
         """Update status."""
         try:
             if self._session_first_update:
@@ -385,7 +389,7 @@ class Connection(object):
         return self._state.get(vin)
 
     @property
-    def validate_login(self):
+    async def validate_login(self):
         try:
             messages = self.post('-/msgc/get-new-messages')
             if messages.get('errorCode', {}) == '0':
@@ -407,21 +411,21 @@ class Vehicle(object):
         self.vin = vin
         self._connection = conn
 
-    def get(self, query):
+    async def get(self, query):
         """Perform a query to the online service."""
         rel = self._connection._session_base + \
             self.data.get('dashboardUrl') + '/'
         req = self._connection.get(query, rel)
         return req
 
-    def post(self, query, **data):
+    async def post(self, query, **data):
         """Perform a query to the online service."""
         rel = self._connection._session_base + \
             self.data.get('dashboardUrl') + '/'
         req = self._connection.post(query, rel, **data)
         return req
 
-    def call(self, method, **data):
+    async def call(self, method, **data):
         """Make remote method call."""
         try:
             if not self._connection.validate_login:
@@ -986,7 +990,7 @@ class Vehicle(object):
             return False
 
     # actions
-    def start_climatisation(self):
+    async def start_climatisation(self):
         """Turn on/off climatisation."""
         if self.climatisation_supported:
             resp = self.call('-/emanager/trigger-climatisation',
@@ -998,7 +1002,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No climatization support.')
 
-    def stop_climatisation(self):
+    async def stop_climatisation(self):
         """Turn on/off climatisation."""
         if self.climatisation_supported:
             resp = self.call('-/emanager/trigger-climatisation',
@@ -1010,7 +1014,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No climatization support.')
 
-    def start_window_heater(self):
+    async def start_window_heater(self):
         """Turn on/off window heater."""
         if self.window_heater_supported:
             resp = self.call(
@@ -1022,7 +1026,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No climatization support.')
 
-    def stop_window_heater(self):
+    async def stop_window_heater(self):
         """Turn on/off window heater."""
         if self.window_heater_supported:
             resp = self.call(
@@ -1032,7 +1036,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No window heating support.')
 
-    def start_combustion_engine_heating(self, spin):
+    async def start_combustion_engine_heating(self, spin):
         if spin:
             if self.combustion_engine_heating_supported:
                 resp = self.call('-/rah/quick-start',
@@ -1046,7 +1050,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('Invalid SPIN provided')
 
-    def stop_combustion_engine_heating(self):
+    async def stop_combustion_engine_heating(self):
         if self.combustion_engine_heating_supported:
             resp = self.call('-/rah/quick-stop')
             if not resp:
@@ -1056,7 +1060,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No combustion engine heating support.')
 
-    def start_charging(self):
+    async def start_charging(self):
         """Turn on/off window heater."""
         if self.charging_supported:
             resp = self.call('-/emanager/charge-battery',
@@ -1068,7 +1072,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No charging support.')
 
-    def stop_charging(self):
+    async def stop_charging(self):
         """Turn on/off window heater."""
         if self.charging_supported:
             resp = self.call('-/emanager/charge-battery',
@@ -1080,7 +1084,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No charging support.')
 
-    def set_climatisation_target_temperature(self, target_temperature):
+    async def set_climatisation_target_temperature(self, target_temperature):
         """Turn on/off window heater."""
         if self.climatisation_supported:
             resp = self.call('-/emanager/set-settings', chargerMaxCurrent=None,
@@ -1093,7 +1097,7 @@ class Vehicle(object):
         else:
             _LOGGER.error('No climatisation support.')
 
-    def get_status(self, timeout=10):
+    async def get_status(self, timeout=10):
         """Check status from call"""
         retry_counter = 0
         while retry_counter < timeout:
